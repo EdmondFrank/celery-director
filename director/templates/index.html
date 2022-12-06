@@ -26,26 +26,20 @@
       crossorigin="anonymous"
     />
     {% else %}
-    <style type="text/css">
-      @font-face {
-        font-family: "Roboto";
-        font-style: normal;
-        font-weight: 400;
-        src: local("Roboto"), local("Roboto-Regular"),
-          url(%%url_for(
-                "user.static",
-                filename= "fonts/KFOkCnqEu92Fr1MmgVxFIzIXKMnyrYk.woff2"
-              )%%)
-            format("woff2");
-      }
-    </style>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900"
+      crossorigin="anonymous"
+    />
     <link
       rel="stylesheet"
       href="%% url_for('user.static', filename='vuetify.min.css') %%"
     />
     <link
       rel="stylesheet"
-      href="%% url_for('user.static', filename='mdi/materialdesignicons.min.css') %%"
+      href="https://cdn.jsdelivr.net/npm/@mdi/font@5.5.55/css/materialdesignicons.min.css"
+      integrity="sha256-HCkcFMiRi/WMAXrgcUj/C5aoUrPtvHxpfbOIlwdsNtg="
+      crossorigin="anonymous"
     />
     {% endif %}
     <link
