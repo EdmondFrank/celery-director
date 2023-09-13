@@ -138,13 +138,17 @@
                   <v-card-text>
                     <v-data-table
                       :loading="loading"
-                      loading-text="Loading... Please wait"
                       :headers="headers"
                       :items="workflows"
-                      :items-per-page="10"
+                      :page="page"
+                      :pageCount="pageCount"
+                      :items-per-page="itemsPerPage"
+                      :server-items-length="totalWorkflows"
                       :sort-by="['created']"
                       :sort-desc="[true]"
                       :search="search"
+                      loading-text="Loading... Please wait"
+                      @update:options="loadWorkflows"
                     >
                       <template v-slot:item="{ item }">
                         <tr
@@ -175,11 +179,12 @@
                   <v-card-text>
                     <v-text-field
                       v-model="search"
-                      label="Search by Date/ID"
+                      label="Search in Payload"
                       label="Append"
                       append-icon="mdi-magnify"
                       single-line
                       hide-details
+                      @keyup.enter="performSearch"
                     ></v-text-field>
                   </v-card-text>
                 </v-card>

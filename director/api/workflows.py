@@ -4,6 +4,7 @@ from distutils.util import strtobool
 import pytz
 from flask import abort, jsonify, request
 from flask import current_app as app
+from sqlalchemy import text
 
 from director.api import api_bp, validate
 from director.auth import auth
@@ -93,10 +94,50 @@ def list_workflows():
     per_page = request.args.get(
         "per_page", type=int, default=app.config["WORKFLOWS_PER_PAGE"]
     )
-    workflows = Workflow.query.order_by(Workflow.created_at.desc()).paginate(
+    name = request.args.get("name", type=str)
+    status = request.args.get("status", type=str)
+    search = request.args.get("search", type=str)
+
+    base_query = Workflow.query
+
+    if search and search != 'undefined':
+        base_query = base_query.filter(text(f"payload like '%{search}%'"))
+
+    if status and status != 'undefined':
+        status = [status.strip() for status in status.split(",")]
+        base_query = base_query.filter(Workflow.status.in_(status))
+
+    if name and name != 'All' and name != 'undefined':
+        project, name = name.split(".")
+        base_query = base_query.filter_by(project=project).filter_by(name=name)
+
+    workflows = base_query.order_by(Workflow.created_at.desc()).paginate(
         page, per_page
     )
     return jsonify([w.to_dict(with_payload=with_payload) for w in workflows.items])
+
+@api_bp.route("/stats")
+@auth.login_required
+def get_stats():
+    name = request.args.get("name", type=str)
+    status = request.args.get("status", type=str)
+    search = request.args.get("search", type=str)
+
+    base_query = Workflow.query
+    if search and search != 'undefined':
+        base_query = base_query.filter(text(f"payload like '%{search}%'"))
+
+    if status and status != 'undefined':
+        status = [status.strip() for status in status.split(",")]
+        base_query = base_query.filter(Workflow.status.in_(status))
+
+    if name and name != 'All' and name != 'undefined':
+        project, name = name.split(".")
+        base_query = base_query.filter_by(project=project).filter_by(name=name)
+
+    workflows = base_query.count()
+
+    return jsonify({"workflows": workflows})
 
 
 @api_bp.route("/workflows/<workflow_id>")

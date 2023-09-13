@@ -42,6 +42,10 @@ const router = new VueRouter({
 const store = new Vuex.Store({
   state: {
     definitions: [],
+    page: 1,
+    pageCount: 0,
+    itemsPerPage: 10,
+    totalWorkflows: 0,
     workflows: [],
     workflowNames: [],
     network: null,
@@ -51,19 +55,29 @@ const store = new Vuex.Store({
     loading: true,
   },
   actions: {
-    listWorkflows({ commit }) {
-      axios.get(API_URL + "/workflows?with_payload=false").then((response) => {
+    listWorkflows({ commit }, { page, itemsPerPage, selectedWorkflowName, selectedStatus, search }) {
+      const status = selectedStatus || [];
+      const statusString = status.join(',');
+      axios.get(API_URL + `/workflows?with_payload=false&page=${page}&per_page=${itemsPerPage}&name=${selectedWorkflowName}&status=${statusString}&search=${search}`)
+        .then((response) => {
         commit("updateWorkflows", response.data);
         commit("changeLoadingState", false);
+      });
+    },
+    statWorkflows({ commit }, { selectedWorkflowName, selectedStatus, search }) {
+      const status = selectedStatus || [];
+      const statusString = status.join(',');
+      axios.get(API_URL + `/stats?name=${selectedWorkflowName}&status=${statusString}&search=${search}`).then((response) => {
+        commit("updateWorkflowsPageCount", response.data);
       });
     },
     listDefinitions({
       commit
     }) {
       axios.get(API_URL + "/definitions").then((response) => {
-        commit('updateDefinitions', response.data)
-        commit('changeLoadingState', false)
-      })
+        commit('updateDefinitions', response.data);
+        commit('changeLoadingState', false);
+      });
     },
     getWorkflow({ commit }, workflow_id) {
       axios.get(API_URL + "/workflows/" + workflow_id).then((response) => {
@@ -79,7 +93,6 @@ const store = new Vuex.Store({
       axios
         .post(API_URL + "/workflows/" + workflow_id + "/relaunch")
         .then((response) => {
-          dispatch("listWorkflows");
           dispatch("getWorkflow", response.data.id);
         });
     },
@@ -91,8 +104,12 @@ const store = new Vuex.Store({
         ...new Set(workflows.map((item) => item.fullname)),
       ]);
     },
+    updateWorkflowsPageCount(state, stat) {
+      state.totalWorkflows = stat.workflows;
+      state.pageCount = Math.ceil(stat.workflows / state.itemsPerPage);
+    },
     updateDefinitions(state, definitions) {
-      state.definitions = definitions
+      state.definitions = definitions;
     },
     updateSelectedWorkflow(state, workflow) {
       state.taskIndex = null;
@@ -236,6 +253,10 @@ new Vue({
     },
     ...Vuex.mapState([
       "definitions",
+      "page",
+      "pageCount",
+      "itemsPerPage",
+      "totalWorkflows",
       "workflows",
       "workflowNames",
       "selectedWorkflow",
@@ -293,6 +314,32 @@ new Vue({
     }
   },
   methods: {
+    performSearch: function() {
+      this.loading = true;
+      this.$store.dispatch('listWorkflows', {
+        page: this.page,
+        itemsPerPage: this.itemsPerPage,
+        selectedWorkflowName: this.selectedWorkflowName,
+        selectedStatus: this.selectedStatus,
+        search: this.search
+      });
+      this.$store.dispatch('statWorkflows', {
+        selectedWorkflowName: this.selectedWorkflowName,
+        selectedStatus: this.selectedStatus,
+        search: this.search
+      });
+      this.loading = false;
+    },
+    loadWorkflows: function({ page, itemsPerPage, sortBy }) {
+      this.loading = true;
+      this.$store.dispatch('listWorkflows', {
+        page, itemsPerPage,
+        selectedWorkflowName: this.selectedWorkflowName,
+        selectedStatus: this.selectedStatus,
+        search: this.search
+      });
+      this.loading = false;
+    },
     moveUp: function () {
       window.scrollTo(0, 0);
     },
@@ -331,7 +378,6 @@ new Vue({
       }
       return "";
     },
-
     runButton: function (item) {
       (this.postWorkflowResponse = ""),
         (this.postWorkflowErrorJSON = ""),
@@ -340,7 +386,6 @@ new Vue({
         (this.snackbar = false),
         (this.selectedRunningWorkflow = item);
     },
-
     runWorkflow: function () {
       this.snackbar = true;
       let payloadValueParsed;
@@ -387,14 +432,42 @@ new Vue({
     "$vuetify.theme.dark"(newValue) {
       localStorage.setItem("dark_theme", newValue);
     },
+    selectedWorkflowName: function (newValue, oldValue) {
+      const { page, itemsPerPage, selectedStatus, search } = this;
+      this.$store.dispatch('listWorkflows', { page, itemsPerPage, selectedWorkflowName: newValue, selectedStatus, search });
+      this.$store.dispatch('statWorkflows', { selectedWorkflowName: newValue, selectedStatus, search });
+    },
+    selectedStatus: function (newValue, oldValue) {
+      const { page, itemsPerPage, selectedWorkflowName, search } = this;
+      this.$store.dispatch('listWorkflows', { page, itemsPerPage, selectedWorkflowName, selectedStatus: newValue, search });
+      this.$store.dispatch('statWorkflows', { selectedWorkflowName, selectedStatus: newValue, search });
+    },
+    // search: function(newValue, oldValue) {
+    //   const { page, itemsPerPage, selectedWorkflowName, selectedStatus } = this;
+    //   this.$store.dispatch('listWorkflows', { page, itemsPerPage, selectedWorkflowName, selectedStatus, search: newValue });
+    //   this.$store.dispatch('statWorkflows', { selectedWorkflowName, selectedStatus, search: newValue });
+    // }
   },
   created() {
+    const { page, itemsPerPage, selectedWorkflowName, selectedStatus, search } = this;
     this.isHome = true;
     this.$store.dispatch('listDefinitions');
-    this.$store.dispatch('listWorkflows');
+    this.$store.dispatch('listWorkflows', { page, itemsPerPage, selectedWorkflowName, selectedStatus, search });
+    this.$store.dispatch('statWorkflows', { selectedWorkflowName, selectedStatus, search });
 
     this.interval = setInterval(() => {
-      this.$store.dispatch("listWorkflows");
+      this.$store.dispatch("listWorkflows", {
+        page: this.page,
+        itemsPerPage: this.itemsPerPage,
+        selectedWorkflowName: this.selectedWorkflowName,
+        selectedStatus: this.selectedStatus,
+        search: this.search
+      });
+      this.$store.dispatch('statWorkflows', {
+        selectedWorkflowName: this.selectedWorkflowName,
+        selectedStatus: this.selectedStatus,
+        search: this.search
+      });
     }, REFRESH_INTERVAL);
 
     if (this.$route.name == "definitions") {
